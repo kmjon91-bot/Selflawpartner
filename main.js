@@ -580,6 +580,7 @@ $("btnDownloadAI").onclick = () => {
 function startApp(){
   document.getElementById("splash").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
+  showReview();
   window.scrollTo(0,0);
 }
 
@@ -658,7 +659,7 @@ function generateAiReview(text, docType){
     const lawHit = _countAny(t, ["민법","민사소송법","판례","대법원","제","조","법리"]);
     item(lawHit>=2, "법리·근거", "조문/판례/법리를 주장과 연결");
     item(hasEvidence, "증거 연결", "갑/을 증거와 각 주장 매칭");
-    item(_countAny(t, ["모순","상충","일관"])>=1 or True, "일관성 점검(권장)", "날짜/금액/사실관계 충돌 여부");
+    item(true, "일관성 점검(권장)", "날짜/금액/사실관계 충돌 여부");
 
     section("유의사항");
     lines.push("- ℹ️ 준비서면은 ‘청구취지’ 자체보다 ‘쟁점/주장/근거/증거’를 중점으로 봅니다.");
