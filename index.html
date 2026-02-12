@@ -1,14 +1,358 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>나홀로 소송 - AI 실무 검토</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+
+<!-- SPLASH -->
+<section id="splash">
+
+    <div class="hero">
+        <div style="font-weight: 800; color: var(--accent); margin-bottom: 10px; letter-spacing: 2px;">AI LEGAL REVIEW</div>
+        <h1>나홀로 소송,<br>더 똑똑하게.</h1>
+        <p>복잡한 소송 서류, 제출 전 AI가 실무 쟁점을 검토합니다.<br>당신의 주장에 법률적 확신을 더하세요.</p>
+        <a href="#" onclick="startApp();return false;" class="btn-start">지금 검토 시작하기 →</a>
+    </div>
+
+</section>
+
+<!-- APP -->
+<section id="app" class="hidden">
+
+<div class="wrap">
+
+  <div class="card topbar">
+    <div class="topbarInner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div class="brandTitle">나홀로 소송 지원</div>
+          <div class="brandSub">구조화 입력(원고/피고/청구취지/청구원인) + PDF OCR (MVP)</div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="goHome">대문</button>
+        <button class="btn primary" id="goReview">문서 작성/업로드</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <section id="home">
+    <div class="grid">
+      <div class="card">
+        <h1>나홀로 소송, 더 똑똑하게</h1>
+        <div class="sub">
+          <b>원고/피고/청구취지/청구원인</b>을 섹션별로 입력하고, 필요하면 PDF를 OCR로 텍스트 변환해 검토합니다.
+        </div>
+        <div class="pillrow">
+          <span class="pill">🧩 구조화 입력</span>
+          <span class="pill">📄 PDF 텍스트 추출</span>
+          <span class="pill">🔎 OCR(스캔 PDF)</span>
+          <span class="pill">✅ 누락/구성 점검</span>
+        </div>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="startBtn">작성/업로드 시작 →</button>
+          <button class="btn" id="scrollFAQ">OCR 준비 체크</button>
+        </div>
+
+        <div class="hr"></div>
+        <div class="mini">
+          🔒 <b>개인정보 팁</b>: 주민번호/계좌/상세주소는 업로드 전 마스킹 권장.<br>
+          ⚠️ 실서비스에서는 개인정보처리방침/보안 저장/보관기간 정책이 반드시 필요합니다.
+        </div>
+      </div>
+
+      <div class="card">
+        <b>OCR 동작 방식</b>
+        <div class="mini" style="margin-top:10px">
+          1) 텍스트형 PDF → 브라우저에서 즉시 추출<br>
+          2) 스캔 PDF/이미지 → <b>OCR API 호출</b> → 추출 텍스트를 문서에 붙이기
+        </div>
+
+        <div class="hr"></div>
+        <div style="border:1px dashed rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.02);padding:12px">
+          <b style="font-size:13px">필수 설정</b>
+          <div class="mini" style="margin-top:6px">
+            OCR이 동작하려면 아래 API가 필요합니다.<br>
+            <b>POST /api/ocr</b> → 응답 <code>{"text":"..."}</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="faq" style="margin-top:14px">
+      <b>OCR 준비 체크</b>
+      <div class="mini" style="margin-top:10px;line-height:1.9">
+        <b>Q. 지금 이 HTML만 올리면 OCR이 되나요?</b><br>
+        A. 아니요. OCR은 서버(Worker)가 필요합니다. 이 페이지는 “OCR 호출 UI”까지 포함한 프론트입니다.<br><br>
+        <b>Q. OCR API는 어떤 응답을 주면 되나요?</b><br>
+        A. JSON으로 <code>{"text":"...추출된 텍스트..."}</code> 형태면 됩니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEW -->
+  <section id="review" class="hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <b style="font-size:16px">문서 작성/업로드</b>
+          <div class="note">“구조화 입력”으로 작성하거나, 파일 업로드(OCR)를 사용할 수 있어요.</div>
+        </div>
+        <button class="btn ghost" id="backToHome">← 대문</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" id="tabWrite">🧩 작성(구조화/자유)</div>
+        <div class="tab" id="tabUpload">📄 업로드(PDF/TXT/이미지)</div>
+      </div>
+
+      <!-- WRITE -->
+      <div id="panelWrite">
+        <div class="segSwitch">
+          <div class="seg active" id="segStructured">구조화 입력</div>
+          <div class="seg" id="segFreeform">자유 입력</div>
+        </div>
+
+        <!-- Structured -->
+        <div id="structuredWrap">
+          <div class="compact">
+            <p class="sectionTitle">1) 당사자(원고/피고)</p>
+            <div class="note" style="margin:-4px 0 10px">
+              원고/피고가 여러 명이면 <b>+</b>로 추가하세요. 주소는 필수로 넣고, 민감정보는 마스킹 권장.
+            </div>
+            <div id="partyList" style="display:grid;gap:10px"></div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn ghost" id="btnAddParty">+ 당사자 추가</button>
+              <button class="btn ghost" id="btnBuildDoc">문서 생성(합치기)</button>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="compact">
+            <p class="sectionTitle">2) 청구취지</p>
+            <textarea id="claimPurpose" placeholder="예) 피고는 원고에게 금 ○○원을 지급하라. / 소송비용은 피고의 부담으로 한다."></textarea>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="compact">
+            <p class="sectionTitle">3) 청구원인</p>
+            <textarea id="claimReason" placeholder="사실관계(일시/장소/경위) → 법률상 주장(요건) → 증거 연결 순으로 작성"></textarea>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="compact">
+            <p class="sectionTitle">4) (선택) 증거 목록</p>
+            <textarea id="evidenceList" placeholder="예) 1. 계약서 사본 1부  2. 문자/카톡 캡처 10장  3. 입금내역 1부"></textarea>
+          </div>
+
+          <div class="note" style="margin-top:10px">
+            ✅ “문서 생성(합치기)”를 누르면 아래 “최종 문서(검토 대상)”에 자동으로 반영됩니다.
+          </div>
+        </div>
+
+        <!-- Freeform -->
+        <div id="freeformWrap" class="hidden">
+          <textarea id="docText" placeholder="소장 텍스트를 자유롭게 붙여넣어 주세요 (원고/피고, 청구취지, 청구원인, 증거목록 등)"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ghost" id="btnUseFreeform">자유 입력을 최종 문서로 적용</button>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <p class="sectionTitle" style="margin-top:0">최종 문서(검토 대상)</p>
+        <textarea id="finalDoc" placeholder="여기에 최종 문서가 들어갑니다. (구조화 입력 → 문서 생성 시 자동 생성)"></textarea>
+
+        <div class="note" style="margin-top:10px">
+          팁) 구조화 입력으로 만든 문서도, 마지막에 여기서 한번 더 다듬으면 좋아요.
+        </div>
+      </div>
+
+      <!-- UPLOAD -->
+      <div id="panelUpload" class="hidden">
+        <input type="file" id="fileInput" accept=".txt,.pdf,image/*">
+        <div class="note">
+          지원: TXT / PDF / 이미지(PNG,JPG)<br>
+          - PDF 텍스트형: 브라우저에서 추출<br>
+          - 스캔 PDF/이미지: <b>OCR API</b>로 추출
+        </div>
+        <div class="progress hidden" id="prog"><div id="progBar"></div></div>
+        <div class="note hidden" id="status"></div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn ghost" id="btnTryOcr" disabled>OCR로 텍스트 추출</button>
+          <button class="btn ghost" id="btnFillText" disabled>추출 텍스트를 최종 문서에 넣기</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      
+<div class="two" style="margin-top:12px">
+  <div>
+    <label class="note">현재 소송 단계</label>
+    <select id="caseStage">
+      <option value="">선택하세요</option>
+      <option>소송 시작 단계 (소장·신청서)</option>
+      <option>상대방 대응 단계 (답변서)</option>
+      <option>주장·반박 정리 단계 (준비서면)</option>
+      <option>절차 보완 단계 (보정서)</option>
+      <option>증거·입증 단계 (증거·문서제출명령)</option>
+      <option>변론·기일 대응 단계 (기일 관련 서류)</option>
+      <option>판결 이후 대응 단계 (항소·집행)</option>
+    </select>
+  </div>
+  <div>
+    <label class="note">단계 안내</label>
+    <div id="stageGuide" class="note" style="min-height:44px">
+      소송의 현재 위치를 선택하면, 이 단계에서 주의할 점을 안내합니다.
+    </div>
+  </div>
+</div>
+
+
+
+  <div class="two" style="margin-top:12px">
+    <div>
+      <label class="note">검토 문서 종류</label>
+      <select id="docType">
+        <option value="">자동 선택</option>
+        <option value="complaint">소장</option>
+        <option value="answer">답변서</option>
+        <option value="brief">준비서면</option>
+        <option value="correction">보정서</option>
+        <option value="evidence">증거·입증 서류</option>
+        <option value="hearing">기일 관련 서류</option>
+        <option value="post">항소·집행 서류</option>
+      </select>
+    </div>
+    <div>
+      <label class="note">이 문서에서 중점 점검</label>
+      <div id="docFocus" class="note" style="min-height:44px">
+        문서 종류가 자동으로 선택되며, 해당 문서에서 무엇을 중점적으로 볼지 안내합니다.
+      </div>
+    </div>
+  </div>
+
+<div class="two">
+        <div>
+          <label class="note">사건 유형</label>
+          <select id="caseType">
+            <option>민사</option><option>형사</option><option>노동</option><option>가사</option><option>행정</option>
+          </select>
+        </div>
+        <div>
+          <label class="note">검토 목표</label>
+          <select id="goal">
+            <option value="dismiss">기각/각하 리스크 줄이기</option>
+            <option value="logic">논리/구성 강화</option>
+            <option value="evidence">증거 정리 & 연결</option>
+            <option value="format">형식/요건 점검</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btnReview">AI 1차 검토(데모)</button>
+        <button class="btn ghost" id="btnCopyAI">AI 리포트 복사</button>
+        <button class="btn ghost" id="btnDownloadAI">리포트 TXT 저장</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>AI 검토 결과</b>
+      <div id="report" class="report note" style="margin-top:10px">아직 검토하지 않았습니다.</div>
+      <div class="hr"></div>
+      <div class="mini">
+        ⚠️ 데모 AI는 규칙 기반입니다. 실제 서비스에서는 LLM + 사건유형 템플릿 + 증거 매핑으로 고도화하면 좋아요.
+      </div>
+    </div>
+
+      <div class="card" id="expertConnectCard" style="border:1px solid rgba(255,106,0,0.35);
+      background:linear-gradient(to bottom, rgba(255,106,0,0.06), transparent);">
+        <h3 style="margin:0 0 6px; color:var(--accent);">👨‍⚖️ 전문가 추천 · 연결</h3>
+        <div class="note" style="margin-bottom:12px">
+          AI 검토 결과를 바탕으로, 지금 단계에서 도움이 되는 전문가 유형을 추천합니다.
+        </div>
+
+        <div class="two">
+          <div>
+            <label class="note">추천 전문가</label>
+            <div id="expertRecommend" class="note" style="min-height:44px">
+              AI 검토 실행 후 추천이 표시됩니다.
+            </div>
+          </div>
+          <div>
+            <label class="note">추천 서비스</label>
+            <div id="serviceRecommend" class="note" style="min-height:44px">
+              AI 검토 실행 후 추천이 표시됩니다.
+            </div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:10px">전문가 유형을 선택하세요</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
+          <button class="btn" type="button" onclick="selectExpert('lawyer')">⚖️ 변호사</button>
+          <button class="btn" type="button" onclick="selectExpert('judicial')">📑 법무사</button>
+          <button class="btn" type="button" onclick="selectExpert('labor')">🧑‍💼 노무사</button>
+        </div>
+
+        <div class="note" style="margin-top:14px">원하시는 서비스를 선택하세요</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <button class="btn" type="button" onclick="selectService('review')">✍️ 기존 서면 첨삭·검토</button>
+          <button class="btn" type="button" onclick="selectService('draft')">📝 전문가 서면 작성</button>
+        </div>
+
+        <div class="two" style="margin-top:14px">
+          <div>
+            <label class="note">연락처(선택)</label>
+            <input id="userContact" placeholder="이메일 또는 휴대폰(선택)">
+          </div>
+          <div>
+            <label class="note">추가 요청사항(선택)</label>
+            <input id="userNote" placeholder="예: 기한 임박, 상대방 주장 요약 등">
+          </div>
+        </div>
+
+        <button id="btnExpertRequest" class="btn primary" style="margin-top:16px;width:100%" type="button"
+          onclick="requestExpert()">
+          전문가 연결 요청하기
+        </button>
+
+        <details style="margin-top:12px">
+          <summary class="note" style="cursor:pointer">전문가에게 전달될 요약 보기</summary>
+          <pre id="expertSummary" class="note" style="white-space:pre-wrap;background:#0f172a;border:1px solid #243041;border-radius:12px;padding:12px;margin-top:10px">AI 검토 실행 후 자동 생성됩니다.</pre>
+        </details>
+      </div>
+
+
+    <div class="card">
+      <b>면책 고지</b>
+      <div class="note" style="margin-top:8px">
+        AI/OCR 결과는 법률자문이 아니라 문서 품질 점검 및 정보 제공 목적의 참고자료입니다.
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script src="main.js"></script>
+
 </body>
+
 </html>
