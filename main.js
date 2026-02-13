@@ -396,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupExpertConnect() {
         document.getElementById('btnExpertRequest').addEventListener('click', () => {
-            if (!selectedExpert || !selectedService) {
+            if (!selectedExpert || || !selectedService) {
                 showToast('전문가 유형과 서비스 유형을 모두 선택해주세요.');
                 return;
             }
@@ -448,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function startApp(){
   document.getElementById("splash").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
-  document.getElementById('review').classList.remove('hidden');
-  document.getElementById('home').classList.add('hidden');
+  document.getElementById('home').classList.remove('hidden');
+  document.getElementById('review').classList.add('hidden');
   window.scrollTo(0,0);
 }
