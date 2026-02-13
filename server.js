@@ -16,20 +16,29 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.post('/upload', upload.single('pdf'), async (req, res) => {
+app.post('/api/ocr', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
 
-  const dataBuffer = fs.readFileSync(req.file.path);
-
   try {
-    const data = await pdf(dataBuffer);
-    const text = data.text;
+    let text = '';
+    if (req.file.mimetype === 'application/pdf') {
+      const dataBuffer = fs.readFileSync(req.file.path);
+      const data = await pdf(dataBuffer);
+      text = data.text;
+    } else if (req.file.mimetype.startsWith('image/')) {
+      // Placeholder for actual OCR processing
+      text = 'OCR processing for images is not implemented in this demo.';
+    } else if (req.file.mimetype === 'text/plain') {
+      text = fs.readFileSync(req.file.path, 'utf-8');
+    } else {
+      return res.status(400).send('Unsupported file type.');
+    }
     res.json({ text: text });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error processing PDF.');
+    res.status(500).send('Error processing file.');
   } finally {
     fs.unlinkSync(req.file.path);
   }
