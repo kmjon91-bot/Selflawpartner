@@ -1,3 +1,4 @@
+
 // --- Stage -> Document-type auto link (for 일반인 UX) ---
 const STAGE_TO_DOCTYPE = {
   "소송 시작 단계 (소장·신청서)":"complaint",
@@ -83,7 +84,7 @@ const DOC_CHECKS = {
   ],
   hearing: [
     {name:"신청 취지", hints:["신청","기일","연기","변경","지정"]},
-    {name:"사유 구체성", hints:["사유","불가피","일정","질병","출장","증빙"]},
+    {name:="사유 구체성", hints:["사유","불가피","일정","질병","출장","증빙"]},
     {name:"증빙", hints:["진단서","확인서","증빙","첨부"]},
   ],
   post: [
@@ -366,9 +367,7 @@ $("btnUseFreeform").addEventListener("click", ()=>{
 renderParties();
 
 // ---------- PDF.js setup ----------
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
-}
+
 
 async function extractTextFromPdf(arrayBuffer){
   if(!window.pdfjsLib) throw new Error("PDF.js 로드 실패");
@@ -390,9 +389,9 @@ async function extractTextFromPdf(arrayBuffer){
 
 // ---------- OCR API call ----------
 async function callOcrApi(file){
-  const endpoint = "/api/ocr";
+  const endpoint = "/upload";
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("pdf", file);
 
   $("status").textContent = "OCR 요청 중… (서버 처리)";
   setProg(15);
@@ -406,6 +405,7 @@ async function callOcrApi(file){
   if(!data || typeof data.text !== "string") throw new Error("OCR API 응답 형식 오류");
   return data.text;
 }
+
 
 // ---------- File handling ----------
 let currentFile = null;
@@ -507,7 +507,7 @@ $("btnTryOcr").addEventListener("click", async ()=>{
     toast("OCR 완료");
   }catch(err){
     console.error(err);
-    $("status").textContent = "❌ OCR 실패: " + err.message + " (서버 /api/ocr 구현 필요)";
+    $("status").textContent = "❌ OCR 실패: " + err.message + " (서버 /upload 구현 필요)";
     $("btnTryOcr").disabled = false;
     setProg(0);
     toast("OCR 실패");
@@ -515,11 +515,37 @@ $("btnTryOcr").addEventListener("click", async ()=>{
   }
 });
 
+
 $("btnFillText").addEventListener("click", ()=>{
   if(!extractedText){ toast("적용할 텍스트가 없습니다"); return; }
   $("finalDoc").value = extractedText;
   toast("최종 문서에 적용 완료");
 });
+
+
+$("btnAiOcrReview").addEventListener("click", async ()=>{
+    if(!currentFile){ toast("검토할 파일이 없습니다"); return; }
+    const btn = $("btnAiOcrReview");
+    btn.disabled = true;
+    $("status").textContent = "OCR 검토 시작…";
+    setProg(5);
+    try{
+      const text = await callOcrApi(currentFile);
+      $("report").textContent = text;
+      toast("OCR 검토 완료");
+
+      $("status").textContent = "✅ OCR 검토 완료";
+      setProg(100);
+    }catch(err){
+      console.error(err);
+      $("status").textContent = "❌ OCR 검토 실패: " + err.message;
+      setProg(0);
+      toast("OCR 검토 실패");
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
 
 // ---------- AI demo review ----------
 let lastAIReportText = "";
