@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('home').classList.add('hidden');
         window.scrollTo(0,0);
     }
-    
+
     // --- 공통 UI ---
     function showToast(message) {
         const toast = document.getElementById('toast');
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
             newParty.innerHTML = `
                 <div class="partyHdr">
                     <b class="partyIdx">당사자 ${partyCount}</b>
-                    <button class="smBtn danger" onclick="removeParty('${partyId}')">삭제</button>
+                    <button type="button" class="smBtn danger" onclick="removeParty('${partyId}')">삭제</button>
                 </div>
                 <div class="two" style="margin-top:8px">
                     <div>
@@ -140,7 +140,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.removeParty = (id) => {
         document.getElementById(id).remove();
-        // re-index parties if needed, for now just remove
     };
 
     // --- 자유 입력 ---
@@ -249,15 +248,44 @@ document.addEventListener('DOMContentLoaded', function() {
         return result.text;
     }
 
-    // --- AI 검토 ---
+    // --- AI 검토 (고도화된 로직) ---
+    const stageGuides = {
+        '소송 시작 단계 (소장·신청서)': '관할 법원, 소가, 인지대/송달료, 필수적 기재사항 등 소장 요건을 정확히 확인해야 합니다.',
+        '상대방 대응 단계 (답변서)': '청구취지에 대한 답변과 청구원인에 대한 구체적인 인정/부인/항변이 가장 중요하며, 30일 이내 제출해야 합니다.',
+        '주장·반박 정리 단계 (준비서면)': '핵심 쟁점에 집중하고, 주장을 뒷받침하는 증거(갑/을 호증)를 명확히 연결하는 것이 중요합니다.',
+        '절차 보완 단계 (보정서)': '법원의 보정명령 내용을 정확히 파악하고, 기한 내에 요구 사항을 모두 충족시키는 것이 절대적으로 중요합니다.',
+        '판결 이후 대응 단계 (항소·집행)': '판결문 송달일로부터 14일 이내에 항소장을 제출해야 하며, 항소취지와 이유를 명확히 밝혀야 합니다.',
+    };
+
     function setupAiReview() {
         document.getElementById('btnReview').addEventListener('click', () => runAiReview('default'));
         document.getElementById('btnAiOcrReview').addEventListener('click', () => runAiReview('ocr'));
+        
+        document.getElementById('caseStage').addEventListener('change', (e) => {
+            const guide = stageGuides[e.target.value] || '소송의 현재 위치를 선택하면, AI가 해당 단계의 핵심을 더 정밀하게 검토합니다.';
+            document.getElementById('stageGuide').textContent = guide;
+        });
+        
+        document.getElementById('btnCopyAI').addEventListener('click', () => {
+            const reportText = document.getElementById('report').textContent;
+            navigator.clipboard.writeText(reportText).then(() => {
+                showToast('AI 리포트가 클립보드에 복사되었습니다.');
+            });
+        });
+
+        document.getElementById('btnDownloadAI').addEventListener('click', () => {
+            const reportText = document.getElementById('report').textContent;
+            const blob = new Blob([reportText], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'AI_정밀검토_리포트.txt';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
     }
 
-    function runAiReview(type) {
+    function runAiReview() {
         const docText = document.getElementById('finalDoc').value;
-        const docType = document.getElementById('docType').value;
         const caseStage = document.getElementById('caseStage').value;
 
         if (docText.trim().length < 50) {
@@ -267,69 +295,86 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const reportDiv = document.getElementById('report');
-        reportDiv.innerHTML = 'AI가 문서를 분석하고 있습니다...';
+        reportDiv.innerHTML = 'AI가 소송 단계별로 문서를 정밀 분석하고 있습니다...';
 
-        // MVP: Rule-based analysis
         setTimeout(() => {
             let findings = [];
-            if (!docText.includes('원고')) findings.push({level: 'error', text: '문서에 "원고"가 명시되지 않았습니다. 당사자 정보가 누락되었을 수 있습니다.'});
-            if (!docText.includes('피고')) findings.push({level: 'error', text: '문서에 "피고"가 명시되지 않았습니다. 당사자 정보가 누락되었을 수 있습니다.'});
-            if (!docText.includes('청구취지')) findings.push({level: 'error', text: '문서에 "청구취지"가 명시되지 않았습니다. 소송의 핵심 요구사항이 누락되었습니다.'});
-            if (!docText.includes('청구원인')) findings.push({level: 'error', text: '문서에 "청구원인"가 명시되지 않았습니다. 주장의 근거가 되는 사실관계 설명이 필요합니다.'});
-            if (docText.match(/금액|금 [0-9,]+원/g) == null) findings.push({level: 'warn', text: '금전 청구액이 명확하게 기재되지 않은 것 같습니다. "금 OOO원" 형식으로 기재해야 합니다.'});
-            if (!docText.includes('입증방법') && !docText.includes('증거')) findings.push({level: 'info', text: '증거(입증방법) 목록이 없습니다. 주장을 뒷받침할 증거를 첨부하고 목록을 작성하는 것이 좋습니다.'});
 
-            // DocType specific rules
-            if (docType === 'complaint') {
-                if (!docText.includes('소장')) findings.push({level: 'warn', text: '문서 종류를 "소장"으로 선택했지만, 문서 내에 "소장"이라는 단어가 없습니다. 문서 제목을 확인하세요.'});
-                if (findings.filter(f=>f.level==='error').length === 0) findings.push({level: 'info', text: '소장의 기본 구성요소(당사자, 청구취지, 청구원인)가 모두 포함된 것으로 보입니다.'});
-            } else if (docType === 'answer') {
-                if (!docText.includes('답변서')) findings.push({level: 'warn', text: '문서 종류를 "답변서"로 선택했지만, 문서 내에 "답변서"라는 단어가 없습니다.'});
-                if (!docText.includes('청구취지에 대한 답변')) findings.push({level: 'error', text: '답변서의 핵심인 "청구취지에 대한 답변" 부분이 명시되지 않았습니다.'});
-                if (!docText.includes('청구원인에 대한 답변')) findings.push({level: 'error', text: '답변서의 핵심인 "청구원인에 대한 답변" 부분이 명시되지 않았습니다.'});
-            }
+            // 1. 공통 필수 항목 검사
+            if (!docText.includes('원고')) findings.push({level: 'error', text: '문서에 "원고"가 명시되지 않았습니다.'});
+            if (!docText.includes('피고')) findings.push({level: 'error', text: '문서에 "피고"가 명시되지 않았습니다.'});
+            if (!docText.includes('청구취지')) findings.push({level: 'error', text: '문서에 "청구취지"가 명시되지 않았습니다.'});
+            if (!docText.includes('청구원인')) findings.push({level: 'error', text: '문서에 "청구원인"이 명시되지 않았습니다.'});
 
-            // Stage specific advice
-            let stageAdvice = '';
-            if (caseStage.includes('시작')) {
-                stageAdvice = '소송 시작 단계에서는 소장의 형식적 요건(당사자, 주소, 청구취지 등)을 명확히 하는 것이 매우 중요합니다. 요건이 누락되면 보정명령을 받을 수 있습니다.';
-            } else if (caseStage.includes('대응')) {
-                stageAdvice = '답변서 제출 기한(소장 부본 송달 후 30일)을 반드시 지켜야 합니다. 기한 내에 답변하지 않으면 무변론 판결로 패소할 수 있습니다.';
-            }
+            // 2. 소송 단계별 세부 규칙 검사
+            const stageRules = {
+                '소송 시작 단계 (소장·신청서)': [
+                    { regex: /관할|법원/, message: '관할 법원(예: 서울중앙지방법원)이 명시되었는지 확인하세요.', level: 'warn' },
+                    { regex: /소송비용은 피고(들)?의 부담으로 한다/, message: ''소송비용 부담'에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
+                    { regex: /가집행할 수 있다/, message: '판결 확정 전 강제집행을 위한 '가집행' 문구가 있는지 확인하세요.', level: 'info' }
+                ],
+                '상대방 대응 단계 (답변서)': [
+                    { regex: /청구취지에 대한 답변/, message: '답변서의 핵심인 "청구취지에 대한 답변" 항목이 누락되었습니다.', level: 'error' },
+                    { regex: /청구원인에 대한 답변/, message: '답변서의 핵심인 "청구원인에 대한 답변" 항목이 누락되었습니다.', level: 'error' },
+                    { regex: /인정|부인|항변/, message: '원고의 주장에 대해 인정, 부인, 항변하는 내용이 명확하지 않을 수 있습니다.', level: 'warn' }
+                ],
+                '주장·반박 정리 단계 (준비서면)': [
+                    { regex: /(갑|을) 제[0-9]+호증/, message: '주장을 뒷받침하는 증거(예: 갑 제1호증)가 인용되었는지 확인하세요.', level: 'info' }
+                ],
+                '판결 이후 대응 단계 (항소·집행)': [
+                    { regex: /항소취지/, message: '항소장의 필수 요소인 "항소취지"(원판결의 변경을 구하는 내용)가 누락되었습니다.', level: 'error' },
+                    { regex: /항소이유/, message: '항소장의 필수 요소인 "항소이유"(원판결의 부당함을 주장하는 이유)가 누락되었습니다.', level: 'error' },
+                    { regex: /원판결의 표시/, message: '어떤 판결에 불복하는지 특정하기 위한 "원판결의 표시"가 있는지 확인하세요.', level: 'warn' }
+                ]
+            };
 
-            // Generate report
-            let report = `## AI 문서 검토 리포트\n\n`;
-            report += `### 1. 기본 항목 체크\n`;
-            if (findings.length > 0) {
-                findings.forEach(f => {
-                    let icon = '✅';
-                    if (f.level === 'error') icon = '❌';
-                    if (f.level === 'warn') icon = '⚠️';
-                    if (f.level === 'info') icon = 'ℹ️';
-                    report += `${icon} ${f.text}\n`;
+            const rulesForCurrentStage = stageRules[caseStage];
+            let stageFindings = [];
+            if (rulesForCurrentStage) {
+                rulesForCurrentStage.forEach(rule => {
+                    if (!rule.regex.test(docText)) {
+                        stageFindings.push({ level: rule.level, text: rule.message });
+                    }
                 });
+            }
+            
+            // --- 리포트 생성 ---
+            let report = `## AI 문서 정밀 검토 리포트\n\n`;
+            const basicErrors = findings.filter(f => f.level === 'error');
+            
+            report += `### 1. 기본 구조 체크\n`;
+            if (basicErrors.length > 0) {
+                basicErrors.forEach(f => { report += `❌ ${f.text}\n`; });
             } else {
-                report += '✅ 문서의 기본 구조(당사자, 청구취지, 청구원인)가 잘 갖추어져 있습니다.\n';
+                report += '✅ 필수 항목(원고, 피고, 청구취지, 청구원인)이 모두 포함되어 있습니다.\n';
             }
 
-            report += `\n### 2. 소송 단계별 조언\n`;
-            if (stageAdvice) {
-                report += `ℹ️ 현재 '${caseStage}' 단계입니다. ${stageAdvice}\n`;
+            report += `\n### 2. 소송 단계별 핵심 사항 체크 ('${caseStage || '단계 미선택'}')\n`;
+            if (caseStage && rulesForCurrentStage) {
+                if (stageFindings.length > 0) {
+                    stageFindings.forEach(f => {
+                        const icon = f.level === 'error' ? '❌' : (f.level === 'warn' ? '⚠️' : 'ℹ️');
+                        report += `${icon} ${f.text}\n`;
+                    });
+                } else {
+                    report += `✅ 선택하신 단계에서 요구되는 핵심 사항들이 잘 포함된 것으로 보입니다.\n`;
+                }
             } else {
-                report += 'ℹ️ 소송 단계를 선택하시면 더 구체적인 조언을 얻을 수 있습니다.\n';
+                report += 'ℹ️ 소송 단계를 선택하시면, 해당 단계에 맞는 정밀 분석을 추가로 제공합니다.\n';
             }
 
+            const allFindings = findings.concat(stageFindings);
+            const totalErrors = allFindings.filter(f => f.level === 'error').length;
             report += `\n### 3. 종합 의견\n`;
-            const errorCount = findings.filter(f => f.level === 'error').length;
-            if (errorCount > 0) {
-                report += `⚠️ 중요 항목(${errorCount}개)이 누락되어 소송 진행에 차질이 생길 수 있습니다. "기본 항목 체크" 목록을 반드시 확인하고 문서를 보완하세요.`;
+            if (totalErrors > 0) {
+                report += `⚠️ 문서의 법적 효력에 영향을 줄 수 있는 중요 항목(${totalErrors}개)이 누락되었습니다. 보고서의 ❌ 표시 항목을 반드시 수정·보완하세요.`;
             } else {
-                report += '👍 문서의 전체적인 구조는 양호합니다. 주장의 논리를 강화하고, 증거 자료를 충분히 준비하는 데 집중하세요.';
+                report += '👍 문서의 전체적인 구조가 안정적입니다. 이제 주장의 논리적 흐름과 증거의 타당성을 높이는 데 집중하세요.';
             }
 
             reportDiv.textContent = report;
-            showToast('AI 검토 완료!');
-            updateExpertRecommendations(findings);
+            showToast('AI 정밀 검토 완료!');
+            updateExpertRecommendations(allFindings);
         }, 1000);
     }
     
@@ -339,14 +384,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     window.selectExpert = (type) => {
         selectedExpert = type;
-        // visual feedback
         document.querySelectorAll('#expertConnectCard .btn[onclick^="selectExpert"]').forEach(b => b.classList.remove('active'));
         document.querySelector(`[onclick="selectExpert('${type}')"]`).classList.add('active');
     };
     
     window.selectService = (type) => {
         selectedService = type;
-        // visual feedback
         document.querySelectorAll('#expertConnectCard .btn[onclick^="selectService"]').forEach(b => b.classList.remove('active'));
         document.querySelector(`[onclick="selectService('${type}')"]`).classList.add('active');
     };
@@ -361,14 +404,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const userContact = document.getElementById('userContact').value;
             const userNote = document.getElementById('userNote').value;
             
-            console.log("--- 전문가 연결 요청 ---");
-            console.log("요청 요약:", summary);
-            console.log("선택 전문가:", selectedExpert);
-            console.log("선택 서비스:", selectedService);
-            console.log("연락처:", userContact);
-            console.log("추가 요청:", userNote);
-
-            showToast('전문가 연결이 요청되었습니다. (데모)');
+            const requestSummary = `--- 전문가 연결 요청 ---\n- 희망 전문가: ${selectedExpert}\n- 희망 서비스: ${selectedService}\n- 연락처: ${userContact || '미입력'}\n- 추가 요청: ${userNote || '없음'}\n\n--- 전달될 문서 요약 ---\n${summary}`;
+            
+            navigator.clipboard.writeText(requestSummary).then(() => {
+                showToast('전문가 요청 정보가 클립보드에 복사되었습니다.');
+            });
         });
     }
 
@@ -377,11 +417,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const caseType = document.getElementById('caseType').value;
 
         let expert = '변호사';
-        if (caseType === '노동') {
-            expert = '노무사';
-        } else if (errorCount === 0) {
-            expert = '법무사';
-        }
+        if (caseType === '노동') expert = '노무사';
+        else if (errorCount === 0) expert = '법무사';
         
         let service = errorCount > 0 ? '기존 서면 첨삭·검토' : '전문가 서면 작성';
 
@@ -392,11 +429,10 @@ document.addEventListener('DOMContentLoaded', function() {
                       `소송 단계: ${document.getElementById('caseStage').value}\n` +
                       `문서 종류: ${document.getElementById('docType').value}\n` +
                       `검토 목표: ${document.getElementById('goal').value}\n\n` +
-                      `--- AI 검토 요약 ---\n` +
-                      (findings && findings.length > 0 ? findings.map(f => `- ${f.text}`).join('\n') : '특별한 이슈 없음');
+                      `--- AI 검토 주요 발견사항 ---\n` +
+                      (findings && findings.length > 0 ? findings.map(f => `- (${f.level.toUpperCase()}) ${f.text}`).join('\n') : '특별한 이슈 없음');
         document.getElementById('expertSummary').textContent = summary;
     }
-
 
     // --- 초기화 ---
     setupPageNavigation();
@@ -412,7 +448,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function startApp(){
   document.getElementById("splash").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
-  // Default to review page
   document.getElementById('review').classList.remove('hidden');
   document.getElementById('home').classList.add('hidden');
   window.scrollTo(0,0);
