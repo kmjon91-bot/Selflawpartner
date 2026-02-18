@@ -159,32 +159,37 @@ document.addEventListener('DOMContentLoaded', function() {
         btnTryOcr.disabled = true;
         progBar.parentElement.classList.remove('hidden');
         progBar.style.width = '0%';
+        statusDiv.textContent = '파일 처리 중...';
         
         try {
-            if (file.type === 'text/plain') {
-                statusDiv.textContent = 'TXT 파일을 읽는 중...';
-                progBar.style.width = '50%';
-                extractedText = await file.text();
-                progBar.style.width = '100%';
-                statusDiv.textContent = 'TXT 파일 읽기 완료.';
-            } else if (file.type === 'application/pdf') {
-                statusDiv.textContent = 'PDF 텍스트 추출 중...';
-                extractedText = await readPdfFile(file);
-                statusDiv.textContent = 'PDF 텍스트 추출 완료.';
-            } else if (file.type.startsWith('image/')) {
-                statusDiv.textContent = '이미지 OCR 요청 중...';
-                extractedText = await ocrRequest(file);
-                statusDiv.textContent = 'OCR 완료.';
-            } else {
-                throw new Error('지원하지 않는 파일 형식입니다.');
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/api/ocr', { // Send to local server
+                method: 'POST',
+                body: formData,
+            });
+            
+            if (!response.ok) {
+                throw new Error(`서버 오류: ${response.statusText}`);
             }
-            btnFillText.disabled = false;
-            showToast('텍스트 추출 성공!');
+            const result = await response.json();
+            if (result.text) {
+                extractedText = result.text;
+                statusDiv.textContent = '텍스트 추출 완료.';
+                btnFillText.disabled = false;
+                showToast('텍스트 추출 성공!');
+            } else {
+                throw new Error('서버로부터 텍스트를 받지 못했습니다.');
+            }
+            progBar.style.width = '100%';
+
         } catch (err) {
             statusDiv.textContent = `오류: ${err.message}`;
-            showToast('텍스트 추출 실패.');
+            showToast('파일 처리 실패.');
         } finally {
             btnTryOcr.disabled = false;
+            // progBar.parentElement.classList.add('hidden'); // Hide progress bar after completion/error
         }
     });
 
@@ -215,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await fetch('https://ocr.ww.pe.kr/api/ocr', {
+        const response = await fetch('/api/ocr', {
             method: 'POST',
             body: formData,
         });
