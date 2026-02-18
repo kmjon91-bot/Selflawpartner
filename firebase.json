@@ -1,0 +1,18 @@
+{
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "app": {
+      "project": "self-law-partner",
+      "public": ".",
+      "base": "/",
+      "source": ".",
+      "runCommand": "npm install && node server.js",
+      "pinTag": ""
+    }
+  }
+}
