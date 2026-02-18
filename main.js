@@ -159,37 +159,32 @@ document.addEventListener('DOMContentLoaded', function() {
         btnTryOcr.disabled = true;
         progBar.parentElement.classList.remove('hidden');
         progBar.style.width = '0%';
-        statusDiv.textContent = '파일 처리 중...';
         
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const response = await fetch('/api/ocr', { // Send to local server
-                method: 'POST',
-                body: formData,
-            });
-            
-            if (!response.ok) {
-                throw new Error(`서버 오류: ${response.statusText}`);
-            }
-            const result = await response.json();
-            if (result.text) {
-                extractedText = result.text;
-                statusDiv.textContent = '텍스트 추출 완료.';
-                btnFillText.disabled = false;
-                showToast('텍스트 추출 성공!');
+            if (file.type === 'text/plain') {
+                statusDiv.textContent = 'TXT 파일을 읽는 중...';
+                progBar.style.width = '50%';
+                extractedText = await file.text();
+                progBar.style.width = '100%';
+                statusDiv.textContent = 'TXT 파일 읽기 완료.';
+            } else if (file.type === 'application/pdf') {
+                statusDiv.textContent = 'PDF 텍스트 추출 중...';
+                extractedText = await readPdfFile(file);
+                statusDiv.textContent = 'PDF 텍스트 추출 완료.';
+            } else if (file.type.startsWith('image/')) {
+                statusDiv.textContent = '이미지 OCR 요청 중...';
+                extractedText = await ocrRequest(file);
+                statusDiv.textContent = 'OCR 완료.';
             } else {
-                throw new Error('서버로부터 텍스트를 받지 못했습니다.');
+                throw new Error('지원하지 않는 파일 형식입니다.');
             }
-            progBar.style.width = '100%';
-
+            btnFillText.disabled = false;
+            showToast('텍스트 추출 성공!');
         } catch (err) {
             statusDiv.textContent = `오류: ${err.message}`;
-            showToast('파일 처리 실패.');
+            showToast('텍스트 추출 실패.');
         } finally {
             btnTryOcr.disabled = false;
-            // progBar.parentElement.classList.add('hidden'); // Hide progress bar after completion/error
         }
     });
 
@@ -291,8 +286,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const stageRules = {
                 '소송 시작 단계 (소장·신청서)': [
                     { regex: /관할|법원/, message: '관할 법원(예: 서울중앙지방법원)이 명시되었는지 확인하세요.', level: 'warn' },
-                    { regex: /소송비용은 피고(?:들)?의 부담으로 한다/, message: ''소송비용 부담'에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
-                    { regex: /가집행할 수 있다/, message: '판결 확정 전 강제집행을 위한 '가집행' 문구가 있는지 확인하세요.', level: 'info' }
+                    { regex: /소송비용은 피고(?:들)?의 부담으로 한다/, message: '소송비용 부담에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
+                    { regex: /가집행할 수 있다/, message: '판결 확정 전 강제집행을 위한 \'가집행\' 문구가 있는지 확인하세요.', level: 'info' }
                 ],
                 '상대방 대응 단계 (답변서)': [
                     { regex: /청구취지에 대한 답변/, message: '답변서의 핵심인 "청구취지에 대한 답변" 항목이 누락되었습니다.', level: 'error' },

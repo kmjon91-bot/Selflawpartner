@@ -28,8 +28,8 @@ app.post('/api/ocr', upload.single('file'), async (req, res) => {
       const data = await pdf(dataBuffer);
       text = data.text;
     } else if (req.file.mimetype.startsWith('image/')) {
-      // Placeholder for actual OCR processing
-      text = 'OCR processing for images is not implemented in this demo.';
+      // Mock OCR processing for images
+      text = `[OCR Text from Image: ${req.file.originalname}] This is a mock OCR result for an image. Real OCR would extract text here.`;
     } else if (req.file.mimetype === 'text/plain') {
       text = fs.readFileSync(req.file.path, 'utf-8');
     } else {

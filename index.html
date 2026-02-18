@@ -483,9 +483,9 @@ select,input[type=file],input{
     }
   }, function(){
     // 2) CDN 폴백 (환경에 따라 MIME 문제가 있을 수 있음)
-    loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js", function(){
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.min.js", function(){
       if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions){
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.worker.min.js";
       }
     }, function(){
       console.warn("pdf.js 로드 실패: 로컬(pdf.min.js) 또는 CDN이 필요합니다.");
