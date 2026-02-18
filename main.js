@@ -1,223 +1,204 @@
-
-// --- 페이지 전환 (전역 함수) ---
-function showHome() {
-    document.getElementById('home').classList.remove('hidden');
-    document.getElementById('review').classList.add('hidden');
-    window.scrollTo(0,0);
-}
-
-function showReview() {
-    document.getElementById('review').classList.remove('hidden');
-    document.getElementById('home').classList.add('hidden');
-    window.scrollTo(0,0);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
 
-    // --- 공통 UI ---
+    // --- State Management ---
+    let selectedExpert = '';
+    let selectedService = '';
+    let extractedText = '';
+    let partyCount = 0;
+
+    // --- DOM Elements ---
+    const toastEl = document.getElementById('toast');
+
+    // --- Core Functions ---
+
     function showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.style.display = 'block';
+        toastEl.textContent = message;
+        toastEl.style.display = 'block';
         setTimeout(() => {
-            toast.style.display = 'none';
+            toastEl.style.display = 'none';
         }, 2500);
     }
 
-    function setupPageNavigation() {
-        document.getElementById('startBtn').addEventListener('click', showReview);
-        document.getElementById('backToHome').addEventListener('click', showHome);
-        document.getElementById('goHome').addEventListener('click', showHome);
-        document.getElementById('goReview').addEventListener('click', showReview);
-        document.getElementById('scrollFAQ').addEventListener('click', () => {
-            document.getElementById('faq').scrollIntoView({ behavior: 'smooth' });
-        });
-    }
+    // --- Event Listener Setup ---
 
-    function setupTabs() {
-        const tabWrite = document.getElementById('tabWrite');
-        const tabUpload = document.getElementById('tabUpload');
-        const panelWrite = document.getElementById('panelWrite');
-        const panelUpload = document.getElementById('panelUpload');
+    // Tabs
+    const tabWrite = document.getElementById('tabWrite');
+    const tabUpload = document.getElementById('tabUpload');
+    const panelWrite = document.getElementById('panelWrite');
+    const panelUpload = document.getElementById('panelUpload');
+    
+    tabWrite.addEventListener('click', () => {
+        tabWrite.classList.add('active');
+        tabUpload.classList.remove('active');
+        panelWrite.classList.remove('hidden');
+        panelUpload.classList.add('hidden');
+    });
+
+    tabUpload.addEventListener('click', () => {
+        tabUpload.classList.add('active');
+        tabWrite.classList.remove('active');
+        panelUpload.classList.remove('hidden');
+        panelWrite.classList.add('hidden');
+    });
+
+    const segStructured = document.getElementById('segStructured');
+    const segFreeform = document.getElementById('segFreeform');
+    const structuredWrap = document.getElementById('structuredWrap');
+    const freeformWrap = document.getElementById('freeformWrap');
+
+    segStructured.addEventListener('click', () => {
+        segStructured.classList.add('active');
+        segFreeform.classList.remove('active');
+        structuredWrap.classList.remove('hidden');
+        freeformWrap.classList.add('hidden');
+    });
+
+    segFreeform.addEventListener('click', () => {
+        segFreeform.classList.add('active');
+        segStructured.classList.remove('active');
+        freeformWrap.classList.remove('hidden');
+        structuredWrap.classList.add('hidden');
+    });
+
+    // Structured Editor
+    const partyList = document.getElementById('partyList');
+    document.getElementById('btnAddParty').addEventListener('click', () => {
+        partyCount++;
+        const partyId = `party-${partyCount}`;
+        const newParty = document.createElement('div');
+        newParty.className = 'partyCard';
+        newParty.id = partyId;
+        newParty.innerHTML = `
+            <div class="partyHdr">
+                <b class="partyIdx">당사자 ${partyCount}</b>
+                <button type="button" class="smBtn danger" data-remove-id="${partyId}">삭제</button>
+            </div>
+            <div class="two" style="margin-top:8px">
+                <div>
+                    <label class="label">구분</label>
+                    <select class="partyType">
+                        <option value="원고">원고</option>
+                        <option value="피고">피고</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">이름</label>
+                    <input type="text" class="partyName" placeholder="홍길동">
+                </div>
+            </div>
+            <div style="margin-top:8px">
+                <label class="label">주소</label>
+                <input type="text" class="partyAddress" placeholder="서울중앙지방법원 관할">
+            </div>
+        `;
+        partyList.appendChild(newParty);
+    });
+
+    partyList.addEventListener('click', (e) => {
+        if(e.target.matches('[data-remove-id]')){
+            const id = e.target.getAttribute('data-remove-id');
+            document.getElementById(id).remove();
+        }
+    });
+
+    document.getElementById('btnBuildDoc').addEventListener('click', () => {
+        let finalText = "";
+        let plaintiffs = [];
+        let defendants = [];
+
+        document.querySelectorAll('.partyCard').forEach(p => {
+            const type = p.querySelector('.partyType').value;
+            const name = p.querySelector('.partyName').value || '이름없음';
+            const address = p.querySelector('.partyAddress').value || '주소없음';
+            const partyInfo = `${name} (주소: ${address})`;
+            if (type === '원고') {
+                plaintiffs.push(partyInfo);
+            } else {
+                defendants.push(partyInfo);
+            }
+        });
+
+        finalText += "원고:\n" + (plaintiffs.length ? plaintiffs.join('\n') : '입력필요') + "\n\n";
+        finalText += "피고:\n" + (defendants.length ? defendants.join('\n') : '입력필요') + "\n\n";
+        finalText += "--- 청구취지 ---\n" + document.getElementById('claimPurpose').value + "\n\n";
+        finalText += "--- 청구원인 ---\n" + document.getElementById('claimReason').value + "\n\n";
+        finalText += "--- 증거목록 ---\n" + document.getElementById('evidenceList').value;
         
-        const segStructured = document.getElementById('segStructured');
-        const segFreeform = document.getElementById('segFreeform');
-        const structuredWrap = document.getElementById('structuredWrap');
-        const freeformWrap = document.getElementById('freeformWrap');
+        document.getElementById('finalDoc').value = finalText;
+        showToast('구조화된 입력으로 문서가 생성되었습니다.');
+    });
 
-        tabWrite.addEventListener('click', () => {
-            tabWrite.classList.add('active');
-            tabUpload.classList.remove('active');
-            panelWrite.classList.remove('hidden');
-            panelUpload.classList.add('hidden');
-        });
+    // Freeform Editor
+    document.getElementById('btnUseFreeform').addEventListener('click', () => {
+        document.getElementById('finalDoc').value = document.getElementById('docText').value;
+        showToast('자유 입력 내용이 최종 문서에 적용되었습니다.');
+    });
 
-        tabUpload.addEventListener('click', () => {
-            tabUpload.classList.add('active');
-            tabWrite.classList.remove('active');
-            panelUpload.classList.remove('hidden');
-            panelWrite.classList.add('hidden');
-        });
+    // File Upload / OCR
+    const fileInput = document.getElementById('fileInput');
+    const btnTryOcr = document.getElementById('btnTryOcr');
+    const btnFillText = document.getElementById('btnFillText');
+    const statusDiv = document.getElementById('status');
+    const progBar = document.getElementById('progBar');
+    
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            btnTryOcr.disabled = false;
+            statusDiv.textContent = `선택된 파일: ${file.name}`;
+            statusDiv.classList.remove('hidden');
+            btnFillText.disabled = true;
+            extractedText = '';
+        }
+    });
 
-        segStructured.addEventListener('click', () => {
-            segStructured.classList.add('active');
-            segFreeform.classList.remove('active');
-            structuredWrap.classList.remove('hidden');
-            freeformWrap.classList.add('hidden');
-        });
+    btnTryOcr.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
 
-        segFreeform.addEventListener('click', () => {
-            segFreeform.classList.add('active');
-            segStructured.classList.remove('active');
-            freeformWrap.classList.remove('hidden');
-            structuredWrap.classList.add('hidden');
-        });
-    }
-
-    // --- 구조화 입력 ---
-    let partyCount = 0;
-    function setupStructuredEditor() {
-        const partyList = document.getElementById('partyList');
-        document.getElementById('btnAddParty').addEventListener('click', () => {
-            partyCount++;
-            const partyId = `party-${partyCount}`;
-            const newParty = document.createElement('div');
-            newParty.className = 'partyCard';
-            newParty.id = partyId;
-            newParty.innerHTML = `
-                <div class="partyHdr">
-                    <b class="partyIdx">당사자 ${partyCount}</b>
-                    <button type="button" class="smBtn danger" onclick="removeParty('${partyId}')">삭제</button>
-                </div>
-                <div class="two" style="margin-top:8px">
-                    <div>
-                        <label class="label">구분</label>
-                        <select class="partyType">
-                            <option value="원고">원고</option>
-                            <option value="피고">피고</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">이름</label>
-                        <input type="text" class="partyName" placeholder="홍길동">
-                    </div>
-                </div>
-                <div style="margin-top:8px">
-                    <label class="label">주소</label>
-                    <input type="text" class="partyAddress" placeholder="서울중앙지방법원 관할">
-                </div>
-            `;
-            partyList.appendChild(newParty);
-        });
-
-        document.getElementById('btnBuildDoc').addEventListener('click', () => {
-            let finalText = "";
-            let plaintiffs = [];
-            let defendants = [];
-
-            document.querySelectorAll('.partyCard').forEach(p => {
-                const type = p.querySelector('.partyType').value;
-                const name = p.querySelector('.partyName').value || '이름없음';
-                const address = p.querySelector('.partyAddress').value || '주소없음';
-                const partyInfo = `${name} (주소: ${address})`;
-                if (type === '원고') {
-                    plaintiffs.push(partyInfo);
-                } else {
-                    defendants.push(partyInfo);
-                }
-            });
-
-            finalText += "원고:\n" + (plaintiffs.length ? plaintiffs.join('\n') : '입력필요') + "\n\n";
-            finalText += "피고:\n" + (defendants.length ? defendants.join('\n') : '입력필요') + "\n\n";
-            finalText += "--- 청구취지 ---\n" + document.getElementById('claimPurpose').value + "\n\n";
-            finalText += "--- 청구원인 ---\n" + document.getElementById('claimReason').value + "\n\n";
-            finalText += "--- 증거목록 ---\n" + document.getElementById('evidenceList').value;
-            
-            document.getElementById('finalDoc').value = finalText;
-            showToast('구조화된 입력으로 문서가 생성되었습니다.');
-        });
-    }
-
-    window.removeParty = (id) => {
-        document.getElementById(id).remove();
-    };
-
-    // --- 자유 입력 ---
-    function setupFreeformEditor() {
-        document.getElementById('btnUseFreeform').addEventListener('click', () => {
-            document.getElementById('finalDoc').value = document.getElementById('docText').value;
-            showToast('자유 입력 내용이 최종 문서에 적용되었습니다.');
-        });
-    }
-
-    // --- 파일 업로드 / OCR ---
-    let extractedText = '';
-    function setupFileUpload() {
-        const fileInput = document.getElementById('fileInput');
-        const btnTryOcr = document.getElementById('btnTryOcr');
-        const btnFillText = document.getElementById('btnFillText');
-        const statusDiv = document.getElementById('status');
-        const progBar = document.getElementById('progBar');
+        btnTryOcr.disabled = true;
+        progBar.parentElement.classList.remove('hidden');
+        progBar.style.width = '0%';
         
-        fileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                btnTryOcr.disabled = false;
-                statusDiv.textContent = `선택된 파일: ${file.name}`;
-                statusDiv.classList.remove('hidden');
-                btnFillText.disabled = true;
-                extractedText = '';
+        try {
+            if (file.type === 'text/plain') {
+                statusDiv.textContent = 'TXT 파일을 읽는 중...';
+                progBar.style.width = '50%';
+                extractedText = await file.text();
+                progBar.style.width = '100%';
+                statusDiv.textContent = 'TXT 파일 읽기 완료.';
+            } else if (file.type === 'application/pdf') {
+                statusDiv.textContent = 'PDF 텍스트 추출 중...';
+                extractedText = await readPdfFile(file);
+                statusDiv.textContent = 'PDF 텍스트 추출 완료.';
+            } else if (file.type.startsWith('image/')) {
+                statusDiv.textContent = '이미지 OCR 요청 중...';
+                extractedText = await ocrRequest(file);
+                statusDiv.textContent = 'OCR 완료.';
+            } else {
+                throw new Error('지원하지 않는 파일 형식입니다.');
             }
-        });
+            btnFillText.disabled = false;
+            showToast('텍스트 추출 성공!');
+        } catch (err) {
+            statusDiv.textContent = `오류: ${err.message}`;
+            showToast('텍스트 추출 실패.');
+        } finally {
+            btnTryOcr.disabled = false;
+        }
+    });
 
-        btnTryOcr.addEventListener('click', async () => {
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            btnTryOcr.disabled = true;
-            progBar.parentElement.classList.remove('hidden');
-            progBar.style.width = '0%';
-            
-            try {
-                if (file.type === 'text/plain') {
-                    statusDiv.textContent = 'TXT 파일을 읽는 중...';
-                    progBar.style.width = '50%';
-                    extractedText = await file.text();
-                    progBar.style.width = '100%';
-                    statusDiv.textContent = 'TXT 파일 읽기 완료.';
-                } else if (file.type === 'application/pdf') {
-                    statusDiv.textContent = 'PDF 텍스트 추출 중...';
-                    extractedText = await readPdfFile(file);
-                    statusDiv.textContent = 'PDF 텍스트 추출 완료.';
-                } else if (file.type.startsWith('image/')) {
-                    statusDiv.textContent = '이미지 OCR 요청 중...';
-                    extractedText = await ocrRequest(file);
-                    statusDiv.textContent = 'OCR 완료.';
-                } else {
-                    throw new Error('지원하지 않는 파일 형식입니다.');
-                }
-                btnFillText.disabled = false;
-                showToast('텍스트 추출 성공!');
-            } catch (err) {
-                statusDiv.textContent = `오류: ${err.message}`;
-                showToast('텍스트 추출 실패.');
-            } finally {
-                btnTryOcr.disabled = false;
-            }
-        });
-
-        btnFillText.addEventListener('click', () => {
-            if (extractedText) {
-                document.getElementById('finalDoc').value = extractedText;
-                showToast('추출된 텍스트를 최종 문서에 적용했습니다.');
-            }
-        });
-    }
+    btnFillText.addEventListener('click', () => {
+        if (extractedText) {
+            document.getElementById('finalDoc').value = extractedText;
+            showToast('추출된 텍스트를 최종 문서에 적용했습니다.');
+        }
+    });
 
     async function readPdfFile(file) {
         const progBar = document.getElementById('progBar');
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const pdf = await window.pdfjsLib.getDocument(arrayBuffer).promise;
         let textContent = '';
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -234,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await fetch('/api/ocr', {
+        const response = await fetch('https://ocr.ww.pe.kr/api/ocr', {
             method: 'POST',
             body: formData,
         });
@@ -248,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return result.text;
     }
 
-    // --- AI 검토 (고도화된 로직) ---
+    // AI Review
     const stageGuides = {
         '소송 시작 단계 (소장·신청서)': '관할 법원, 소가, 인지대/송달료, 필수적 기재사항 등 소장 요건을 정확히 확인해야 합니다.',
         '상대방 대응 단계 (답변서)': '청구취지에 대한 답변과 청구원인에 대한 구체적인 인정/부인/항변이 가장 중요하며, 30일 이내 제출해야 합니다.',
@@ -257,32 +238,30 @@ document.addEventListener('DOMContentLoaded', function() {
         '판결 이후 대응 단계 (항소·집행)': '판결문 송달일로부터 14일 이내에 항소장을 제출해야 하며, 항소취지와 이유를 명확히 밝혀야 합니다.',
     };
 
-    function setupAiReview() {
-        document.getElementById('btnReview').addEventListener('click', () => runAiReview('default'));
-        document.getElementById('btnAiOcrReview').addEventListener('click', () => runAiReview('ocr'));
-        
-        document.getElementById('caseStage').addEventListener('change', (e) => {
-            const guide = stageGuides[e.target.value] || '소송의 현재 위치를 선택하면, AI가 해당 단계의 핵심을 더 정밀하게 검토합니다.';
-            document.getElementById('stageGuide').textContent = guide;
+    document.getElementById('btnReview').addEventListener('click', () => runAiReview('default'));
+    document.getElementById('btnAiOcrReview').addEventListener('click', () => runAiReview('ocr'));
+    
+    document.getElementById('caseStage').addEventListener('change', (e) => {
+        const guide = stageGuides[e.target.value] || '소송의 현재 위치를 선택하면, 이 단계에서 주의할 점을 안내합니다.';
+        document.getElementById('stageGuide').textContent = guide;
+    });
+    
+    document.getElementById('btnCopyAI').addEventListener('click', () => {
+        const reportText = document.getElementById('report').textContent;
+        navigator.clipboard.writeText(reportText).then(() => {
+            showToast('AI 리포트가 클립보드에 복사되었습니다.');
         });
-        
-        document.getElementById('btnCopyAI').addEventListener('click', () => {
-            const reportText = document.getElementById('report').textContent;
-            navigator.clipboard.writeText(reportText).then(() => {
-                showToast('AI 리포트가 클립보드에 복사되었습니다.');
-            });
-        });
+    });
 
-        document.getElementById('btnDownloadAI').addEventListener('click', () => {
-            const reportText = document.getElementById('report').textContent;
-            const blob = new Blob([reportText], { type: 'text/plain' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'AI_정밀검토_리포트.txt';
-            link.click();
-            URL.revokeObjectURL(link.href);
-        });
-    }
+    document.getElementById('btnDownloadAI').addEventListener('click', () => {
+        const reportText = document.getElementById('report').textContent;
+        const blob = new Blob([reportText], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'AI_정밀검토_리포트.txt';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
 
     function runAiReview() {
         const docText = document.getElementById('finalDoc').value;
@@ -299,18 +278,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(() => {
             let findings = [];
-
-            // 1. 공통 필수 항목 검사
             if (!docText.includes('원고')) findings.push({level: 'error', text: '문서에 "원고"가 명시되지 않았습니다.'});
             if (!docText.includes('피고')) findings.push({level: 'error', text: '문서에 "피고"가 명시되지 않았습니다.'});
             if (!docText.includes('청구취지')) findings.push({level: 'error', text: '문서에 "청구취지"가 명시되지 않았습니다.'});
             if (!docText.includes('청구원인')) findings.push({level: 'error', text: '문서에 "청구원인"이 명시되지 않았습니다.'});
 
-            // 2. 소송 단계별 세부 규칙 검사
             const stageRules = {
                 '소송 시작 단계 (소장·신청서)': [
                     { regex: /관할|법원/, message: '관할 법원(예: 서울중앙지방법원)이 명시되었는지 확인하세요.', level: 'warn' },
-                    { regex: /소송비용은 피고(들)?의 부담으로 한다/, message: ''소송비용 부담'에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
+                    { regex: /소송비용은 피고(?:들)?의 부담으로 한다/, message: ''소송비용 부담'에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
                     { regex: /가집행할 수 있다/, message: '판결 확정 전 강제집행을 위한 '가집행' 문구가 있는지 확인하세요.', level: 'info' }
                 ],
                 '상대방 대응 단계 (답변서)': [
@@ -338,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             
-            // --- 리포트 생성 ---
             let report = `## AI 문서 정밀 검토 리포트\n\n`;
             const basicErrors = findings.filter(f => f.level === 'error');
             
@@ -378,39 +353,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     }
     
-    // --- 전문가 연결 ---
-    let selectedExpert = '';
-    let selectedService = '';
-    
-    window.selectExpert = (type) => {
-        selectedExpert = type;
-        document.querySelectorAll('#expertConnectCard .btn[onclick^="selectExpert"]').forEach(b => b.classList.remove('active'));
-        document.querySelector(`[onclick="selectExpert('${type}')"]`).classList.add('active');
-    };
-    
-    window.selectService = (type) => {
-        selectedService = type;
-        document.querySelectorAll('#expertConnectCard .btn[onclick^="selectService"]').forEach(b => b.classList.remove('active'));
-        document.querySelector(`[onclick="selectService('${type}')"]`).classList.add('active');
-    };
+    // Expert Connect
+    document.querySelector('.expert-buttons').addEventListener('click', (e) => {
+        if(e.target.matches('[data-expert-type]')) {
+            selectedExpert = e.target.dataset.expertType;
+            document.querySelectorAll('[data-expert-type]').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        }
+    });
 
-    function setupExpertConnect() {
-        document.getElementById('btnExpertRequest').addEventListener('click', () => {
-            if (!selectedExpert || !selectedService) {
-                showToast('전문가 유형과 서비스 유형을 모두 선택해주세요.');
-                return;
-            }
-            const summary = document.getElementById('expertSummary').textContent;
-            const userContact = document.getElementById('userContact').value;
-            const userNote = document.getElementById('userNote').value;
-            
-            const requestSummary = `--- 전문가 연결 요청 ---\n- 희망 전문가: ${selectedExpert}\n- 희망 서비스: ${selectedService}\n- 연락처: ${userContact || '미입력'}\n- 추가 요청: ${userNote || '없음'}\n\n--- 전달될 문서 요약 ---\n${summary}`;
-            
-            navigator.clipboard.writeText(requestSummary).then(() => {
-                showToast('전문가 요청 정보가 클립보드에 복사되었습니다.');
-            });
+    document.querySelector('.service-buttons').addEventListener('click', (e) => {
+        if(e.target.matches('[data-service-type]')) {
+            selectedService = e.target.dataset.serviceType;
+            document.querySelectorAll('[data-service-type]').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        }
+    });
+
+    document.getElementById('btnExpertRequest').addEventListener('click', () => {
+        if (!selectedExpert || !selectedService) {
+            showToast('전문가 유형과 서비스 유형을 모두 선택해주세요.');
+            return;
+        }
+        const summary = document.getElementById('expertSummary').textContent;
+        const userContact = document.getElementById('userContact').value;
+        const userNote = document.getElementById('userNote').value;
+        
+        const requestSummary = `--- 전문가 연결 요청 ---\n- 희망 전문가: ${selectedExpert}\n- 희망 서비스: ${selectedService}\n- 연락처: ${userContact || '미입력'}\n- 추가 요청: ${userNote || '없음'}\n\n--- 전달될 문서 요약 ---\n${summary}`;
+        
+        navigator.clipboard.writeText(requestSummary).then(() => {
+            showToast('전문가 요청 정보가 클립보드에 복사되었습니다.');
         });
-    }
+    });
 
     function updateExpertRecommendations(findings) {
         const errorCount = findings ? findings.filter(f => f.level === 'error').length : 0;
@@ -434,20 +408,4 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('expertSummary').textContent = summary;
     }
 
-    // --- 초기화 ---
-    setupPageNavigation();
-    setupTabs();
-    setupStructuredEditor();
-    setupFreeformEditor();
-    setupFileUpload();
-    setupAiReview();
-    setupExpertConnect();
 });
-
-// App-wide functions that are called from HTML
-function startApp(){
-  document.getElementById("splash").classList.add("hidden");
-  document.getElementById("app").classList.remove("hidden");
-  showReview();
-  window.scrollTo(0,0);
-}
