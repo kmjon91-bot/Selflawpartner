@@ -5,20 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>나홀로 소송 - AI 실무 검토</title>
 
-<!-- ✅ FIX: pdf.js CDN MIME 오류 대비 (로컬 사용 권장)
-     1) 같은 폴더에 pdf.min.js / pdf.worker.min.js 를 두면 가장 안정적입니다.
-     2) 로컬이 없을 때만 CDN을 시도하도록 'onerror' 폴백을 둡니다.
--->
-<script>
-  // 로컬 우선 로더
-  function loadScript(src, onload, onerror){
-    const s=document.createElement('script');
-    s.src=src; s.crossOrigin="anonymous"; s.referrerPolicy="no-referrer";
-    s.onload=onload; s.onerror=onerror;
-    document.head.appendChild(s);
-  }
-</script>
-
 <style>
 /* (기존 CSS 그대로) */
 :root {
@@ -109,7 +95,6 @@ select,input[type=file],input{
 .progress > div{height:100%;width:0%;background:var(--accent);transition:width .2s}
 .hr{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:rgba(18,24,38,.98);border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:14px;color:var(--text);font-size:12px;display:none}
-
 .segSwitch{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .seg{padding:8px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);cursor:pointer;font-size:13px;font-weight:900;user-select:none;background:rgba(255,255,255,.02)}
 .seg.active{background:rgba(255,106,0,.20);border-color:rgba(255,106,0,.50)}
@@ -464,75 +449,87 @@ select,input[type=file],input{
 
 <div class="toast" id="toast"></div>
 
-<!-- ✅ FIX: pdfjsLib가 없을 때도 페이지가 죽지 않게 방어 + 로컬 우선 -->
 <script>
 (function(){
+  function $(id){ return document.getElementById(id); }
+  function show(el){ if(el) el.classList.remove("hidden"); }
+  function hide(el){ if(el) el.classList.add("hidden"); }
+
+  function setView(view){
+    // splash / app / home / review 상태를 명확히 관리
+    const splash = $("splash");
+    const app    = $("app");
+    const home   = $("home");
+    const review = $("review");
+
+    if(view === "splash"){
+      show(splash); hide(app);
+      return;
+    }
+
+    // app 영역으로 진입
+    hide(splash); show(app);
+
+    if(view === "home"){
+      show(home); hide(review);
+    } else if(view === "review"){
+      hide(home); show(review);
+    }
+    window.scrollTo(0,0);
+  }
+
+  // ✅ 전역으로 노출(중요): main.js나 HTML 인라인 onclick이 불러도 동작
+  window.startApp  = () => setView("home");
+  window.showHome  = () => setView("home");
+  window.showReview= () => setView("review");
+
+  // pdf.js 로더 (원본 유지 + 안정성만 조금 보강)
+  function loadScript(src, onload, onerror){
+    const s=document.createElement('script');
+    s.src=src; s.crossOrigin="anonymous"; s.referrerPolicy="no-referrer";
+    s.onload=onload; s.onerror=onerror;
+    document.head.appendChild(s);
+  }
+
   function setPdfWorker(){
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions){
-      // 로컬 우선
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.js";
       return true;
     }
     return false;
   }
 
-  // 1) 로컬 pdf.min.js 시도
   loadScript("./pdf.min.js", function(){
-    if (!setPdfWorker()){
-      console.warn("pdf.js 로드됨, worker 설정 실패");
-    }
+    setPdfWorker();
   }, function(){
-    // 2) CDN 폴백 (환경에 따라 MIME 문제가 있을 수 있음)
     loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.min.js", function(){
       if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions){
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.worker.min.js";
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.worker.min.js";
       }
     }, function(){
       console.warn("pdf.js 로드 실패: 로컬(pdf.min.js) 또는 CDN이 필요합니다.");
     });
   });
 
-  // ✅ FIX: main.js가 죽더라도 최소 네비게이션은 동작하도록 기본 함수 제공
-  function $(id){ return document.getElementById(id); }
-  function show(el){ el && el.classList.remove("hidden"); }
-  function hide(el){ el && el.classList.add("hidden"); }
-
-  let currentPage = 'splash';
-
-  function showHome(){
-    hide($(currentPage));
-    show($("home"));
-    currentPage = 'home';
-    window.scrollTo(0,0);
-  };
-
-  function showReview(){
-    hide($(currentPage));
-    show($("review"));
-    currentPage = 'review';
-    window.scrollTo(0,0);
-  };
-
-  function startApp(){
-    hide($("splash"));
-    show($("app"));
-    showHome(); // Start at home page
-    currentPage = 'home';
-  };
-
-  // 버튼 바인딩(인라인 onclick 없어도 작동)
+  // 이벤트 바인딩
   window.addEventListener("DOMContentLoaded", function(){
-    $("startAppBtn")?.addEventListener("click", function(e){ e.preventDefault(); startApp(); });
-    $("goHome")?.addEventListener("click", showHome);
-    $("goReview")?.addEventListener("click", showReview);
-    $("startReviewBtn")?.addEventListener("click", showReview);
-    $("backToHome")?.addEventListener("click", showHome);
+    // 초기 화면: splash
+    setView("splash");
+
+    $("startAppBtn")?.addEventListener("click", function(e){ e.preventDefault(); window.startApp(); });
+    $("goHome")?.addEventListener("click", function(){ window.showHome(); });
+    $("goReview")?.addEventListener("click", function(){ window.showReview(); });
+    $("startReviewBtn")?.addEventListener("click", function(){ window.showReview(); });
+    $("backToHome")?.addEventListener("click", function(){ window.showHome(); });
     $("scrollFAQ")?.addEventListener("click", function(){ $("faq")?.scrollIntoView({behavior:"smooth"}); });
+
+    // 혹시 기존 코드/인라인 호출이 남아있을 때 대비
+    // (버튼이 onclick="startApp()" 같은 형태여도 동작하게)
   });
 })();
 </script>
 
-<!-- 기존 main.js (⚠️ 여기서 '소송비용' 문법 오류를 반드시 수정해야 합니다) -->
 <script src="main.js"></script>
 
 </body>
