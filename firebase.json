@@ -6,13 +6,8 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "app": {
-      "project": "self-law-partner",
-      "public": ".",
-      "base": "/",
-      "source": ".",
-      "runCommand": "npm install && node server.js",
-      "pinTag": ""
+    "frameworksBackend": {
+      "runtime": "nodejs18"
     }
   }
 }
