@@ -222,7 +222,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         progBar.style.width = '80%';
         if (!response.ok) {
-            throw new Error(`OCR 서버 오류: ${response.statusText}`);
+            const errorResult = await response.json().catch(() => ({ error: '서버 응답을 파싱할 수 없습니다.' }));
+            throw new Error(errorResult.error || `OCR 서버 오류: ${response.statusText}`);
         }
         const result = await response.json();
         progBar.style.width = '100%';
@@ -235,6 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
         '상대방 대응 단계 (답변서)': '청구취지에 대한 답변과 청구원인에 대한 구체적인 인정/부인/항변이 가장 중요하며, 30일 이내 제출해야 합니다.',
         '주장·반박 정리 단계 (준비서면)': '핵심 쟁점에 집중하고, 주장을 뒷받침하는 증거(갑/을 호증)를 명확히 연결하는 것이 중요합니다.',
         '절차 보완 단계 (보정서)': '법원의 보정명령 내용을 정확히 파악하고, 기한 내에 요구 사항을 모두 충족시키는 것이 절대적으로 중요합니다.',
+        '증거·입증 단계 (증거·문서제출명령)': '증거신청의 취지와 입증할 사실을 명확히 하고, 상대방의 증거에 대한 의견을 밝혀야 합니다.',
         '판결 이후 대응 단계 (항소·집행)': '판결문 송달일로부터 14일 이내에 항소장을 제출해야 하며, 항소취지와 이유를 명확히 밝혀야 합니다.',
     };
 
@@ -278,29 +280,47 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(() => {
             let findings = [];
-            if (!docText.includes('원고')) findings.push({level: 'error', text: '문서에 "원고"가 명시되지 않았습니다.'});
-            if (!docText.includes('피고')) findings.push({level: 'error', text: '문서에 "피고"가 명시되지 않았습니다.'});
-            if (!docText.includes('청구취지')) findings.push({level: 'error', text: '문서에 "청구취지"가 명시되지 않았습니다.'});
-            if (!docText.includes('청구원인')) findings.push({level: 'error', text: '문서에 "청구원인"이 명시되지 않았습니다.'});
+            // 1. Basic Structure Check (Always Active)
+            if (!/원고/.test(docText)) findings.push({level: 'error', text: '문서에 "원고"가 명시되지 않았습니다. 원고의 이름, 주소, 연락처를 정확히 기재해야 합니다.'});
+            if (!/피고/.test(docText)) findings.push({level: 'error', text: '문서에 "피고"가 명시되지 않았습니다. 피고의 이름, 주소를 정확히 기재해야 합니다.'});
+            if (!/청구취지/.test(docText)) findings.push({level: 'error', text: '소송의 결론인 "청구취지"가 누락되었습니다. 원하는 판결 내용을 명확히 해야 합니다.'});
+            if (!/청구원인/.test(docText)) findings.push({level: 'error', text: '주장의 이유인 "청구원인"이 누락되었습니다. 사실관계와 법적 주장을 상세히 서술해야 합니다.'});
 
+            // 2. Stage-Specific Rules
             const stageRules = {
                 '소송 시작 단계 (소장·신청서)': [
-                    { regex: /관할|법원/, message: '관할 법원(예: 서울중앙지방법원)이 명시되었는지 확인하세요.', level: 'warn' },
-                    { regex: /소송비용은 피고(?:들)?의 부담으로 한다/, message: '소송비용 부담에 대한 문구가 누락되었을 수 있습니다.', level: 'info' },
-                    { regex: /가집행할 수 있다/, message: '판결 확정 전 강제집행을 위한 \'가집행\' 문구가 있는지 확인하세요.', level: 'info' }
+                    { regex: /관할|법원/, message: '관할 법원(예: 서울중앙지방법원)이 명시되었는지 확인하세요. 관할이 틀리면 이송될 수 있습니다.', level: 'warn' },
+                    { regex: /소가|소송목적의 값/, message: '소가(소송물의 가액)가 산정되었는지 확인하세요. 인지대 산정의 기준이 됩니다.', level: 'warn' },
+                    { regex: /인지|송달료/, message: '인지대 및 송달료 납부에 대한 언급이 있는지 확인하는 것이 좋습니다.', level: 'info' },
+                    { regex: /소송비용은 피고(?:들)?의 부담으로 한다/, message: '소송비용 부담에 대한 청구(예: \'소송비용은 피고의 부담으로 한다.\')가 누락되었을 수 있습니다.', level: 'info' },
+                    { regex: /가집행할 수 있다/, message: '판결 확정 전 빠른 강제집행을 위한 \'가집행 선고\' 요청이 누락되었을 수 있습니다.', level: 'info' }
                 ],
                 '상대방 대응 단계 (답변서)': [
-                    { regex: /청구취지에 대한 답변/, message: '답변서의 핵심인 "청구취지에 대한 답변" 항목이 누락되었습니다.', level: 'error' },
-                    { regex: /청구원인에 대한 답변/, message: '답변서의 핵심인 "청구원인에 대한 답변" 항목이 누락되었습니다.', level: 'error' },
-                    { regex: /인정|부인|항변/, message: '원고의 주장에 대해 인정, 부인, 항변하는 내용이 명확하지 않을 수 있습니다.', level: 'warn' }
+                    { regex: /청구취지에 대한 답변/, message: '답변서의 핵심인 "청구취지에 대한 답변"(예: \'원고의 청구를 기각한다.\') 항목이 누락되었습니다.', level: 'error' },
+                    { regex: /청구원인에 대한 답변/, message: '답변서의 핵심인 "청구원인에 대한 답변"(원고 주장에 대한 반박) 항목이 누락되었습니다.', level: 'error' },
+                    { regex: /인정|부인|항변/, message: '원고의 청구원인 각 항목에 대해 구체적으로 인정, 부인, 항변하는 내용이 명확하지 않을 수 있습니다.', level: 'warn' },
+                    { regex: /입증방법|서증/, message: '답변을 뒷받침할 증거(입증방법)가 준비되었는지 확인하세요. (예: 을 제1호증)', level: 'info' }
                 ],
                 '주장·반박 정리 단계 (준비서면)': [
-                    { regex: /(갑|을) 제[0-9]+호증/, message: '주장을 뒷받침하는 증거(예: 갑 제1호증)가 인용되었는지 확인하세요.', level: 'info' }
+                    { regex: /(갑|을) 제[0-9]+호증/, message: '주장을 뒷받침하는 증거(예: 갑 제1호증, 을 제2호증)가 명확히 인용되고 있는지 확인하세요.', level: 'warn' },
+                    { regex: /주장|항변|반박/, message: '이전 서면의 주장을 반복하기보다, 새로운 주장이나 상대방 주장에 대한 구체적인 반박을 중심으로 작성되었는지 검토하세요.', level: 'info' },
+                    { regex: /입증|증명/, message: '자신의 주장을 입증할 책임이 있는 항목에 대해 충분한 증명이 이루어지고 있는지 확인이 필요합니다.', level: 'info' }
+                ],
+                 '절차 보완 단계 (보정서)': [
+                    { regex: /보정명령/, message: '법원의 보정명령 등본을 받았는지, 그 내용을 정확히 반영하고 있는지 확인해야 합니다.', level: 'error' },
+                    { regex: /보정할 사항/, message: '법원이 보정을 명한 사항(예: 청구취지 특정, 주소 보정)이 무엇인지 명확히 하고, 그에 맞춰 작성되었는지 확인하세요.', level: 'warn' },
+                    { regex: /제출 기한|기한 내/, message: '보정명령에서 정한 제출 기한을 반드시 준수해야 합니다. 기한 확인이 필요합니다.', level: 'info' }
+                ],
+                '증거·입증 단계 (증거·문서제출명령)': [
+                    { regex: /증거신청|문서제출명령/, message: '증거신청의 취지나 문서제출명령 신청의 이유가 명확히 기재되었는지 확인하세요.', level: 'warn' },
+                    { regex: /입증취지/, message: '해당 증거를 통해 무엇을 입증하려 하는지(입증취지)가 명확해야 법원이 채택할 가능성이 높습니다.', level: 'info' },
+                    { regex: /목록/, message: '제출할 증거나 신청할 문서의 목록이 정확하게 기재되었는지 확인하세요.', level: 'info' }
                 ],
                 '판결 이후 대응 단계 (항소·집행)': [
                     { regex: /항소취지/, message: '항소장의 필수 요소인 "항소취지"(원판결의 변경을 구하는 내용)가 누락되었습니다.', level: 'error' },
-                    { regex: /항소이유/, message: '항소장의 필수 요소인 "항소이유"(원판결의 부당함을 주장하는 이유)가 누락되었습니다.', level: 'error' },
-                    { regex: /원판결의 표시/, message: '어떤 판결에 불복하는지 특정하기 위한 "원판결의 표시"가 있는지 확인하세요.', level: 'warn' }
+                    { regex: /항소이유/, message: '항소장의 필수 요소인 "항소이유"(원판결이 부당한 이유)가 누락되었습니다.', level: 'error' },
+                    { regex: /원판결의 표시/, message: '어떤 판결에 불복하는지 특정하기 위한 "원판결의 표시"가 있는지 확인하세요. 사건번호, 법원, 선고일자 등이 포함되어야 합니다.', level: 'warn' },
+                    { regex: /항소장 제출 기한/, message: '판결문 송달일로부터 14일 이내 제출 원칙을 인지하고 있는지 확인이 필요합니다.', level: 'info' }
                 ]
             };
 
@@ -329,10 +349,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (stageFindings.length > 0) {
                     stageFindings.forEach(f => {
                         const icon = f.level === 'error' ? '❌' : (f.level === 'warn' ? '⚠️' : 'ℹ️');
-                        report += `${icon} ${f.text}\n`;
+                        report += `${icon} [${f.level.toUpperCase()}] ${f.text}\n`;
                     });
                 } else {
-                    report += `✅ 선택하신 단계에서 요구되는 핵심 사항들이 잘 포함된 것으로 보입니다.\n`;
+                    report += `✅ 선택하신 단계에서 요구되는 핵심 사항들이 잘 포함된 것으로 보입니다. (규칙 기반 체크)\n`;
                 }
             } else {
                 report += 'ℹ️ 소송 단계를 선택하시면, 해당 단계에 맞는 정밀 분석을 추가로 제공합니다.\n';
@@ -340,11 +360,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const allFindings = findings.concat(stageFindings);
             const totalErrors = allFindings.filter(f => f.level === 'error').length;
+            const totalWarnings = allFindings.filter(f => f.level === 'warn').length;
+
             report += `\n### 3. 종합 의견\n`;
             if (totalErrors > 0) {
-                report += `⚠️ 문서의 법적 효력에 영향을 줄 수 있는 중요 항목(${totalErrors}개)이 누락되었습니다. 보고서의 ❌ 표시 항목을 반드시 수정·보완하세요.`;
+                report += `⚠️ [심각] 문서의 법적 효력에 영향을 줄 수 있는 중요 항목(${totalErrors}개)이 누락되었을 가능성이 높습니다. 보고서의 ❌ 표시 항목을 반드시 수정·보완하세요.`;
+            } else if (totalWarnings > 0) {
+                report += `🟡 [주의] 문서의 완성도를 높이기 위해 추가 검토가 필요한 항목(${totalWarnings}개)이 있습니다. ⚠️ 표시 항목을 확인하여 보강하는 것을 권장합니다.`;
             } else {
-                report += '👍 문서의 전체적인 구조가 안정적입니다. 이제 주장의 논리적 흐름과 증거의 타당성을 높이는 데 집중하세요.';
+                report += '👍 [양호] 문서의 전체적인 기본 구조가 안정적입니다. 이제 주장의 논리적 흐름과 증거의 타당성을 높이는 데 집중하세요.';
             }
 
             reportDiv.textContent = report;
